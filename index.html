@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>So sánh lãi suất ngân hàng</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;background:#f1f5f9;margin:0;padding:16px}
+.app{max-width:420px;margin:auto}
+.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,.08);margin-bottom:16px}
+h2{text-align:center}
+label{font-size:14px;font-weight:600;margin-top:10px;display:block}
+input,select{width:100%;padding:10px;margin-top:4px;border-radius:10px;border:1px solid #cbd5e1;font-size:15px}
+button{width:100%;padding:12px;border:none;border-radius:14px;background:#2563eb;color:#fff;font-size:16px;font-weight:600;margin-top:12px;cursor:pointer}
+.bank{font-weight:700}
+.winner{background:#ecfeff;border:2px solid #06b6d4;border-radius:12px;padding:10px;margin-top:10px}
+.badge{background:#06b6d4;color:#fff;font-size:12px;padding:2px 8px;border-radius:999px;margin-left:6px}
+.state{background:#16a34a}
+.private{background:#f97316}
+.diff{color:#dc2626;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card">
+    <h2>💰 So sánh lãi suất</h2>
+
+    <label>Số tiền gửi (VNĐ)</label>
+	<input id="money" type="text"
+       value="100.000.000"
+       oninput="formatMoney(this);syncSlider()">
+
+<div style="display:flex;gap:8px;margin-top:8px">
+  <button type="button" onclick="addMoney(50000000)">+50tr</button>
+  <button type="button" onclick="addMoney(100000000)">+100tr</button>
+  <button type="button" onclick="addMoney(500000000)">+500tr</button>
+</div>
+
+<input id="moneyRange" type="range"
+       min="0"
+       max="5000000000"
+       step="10000000"
+       value="100000000"
+       oninput="syncInput()">
+
+<div id="moneyUnit"
+     style="margin-top:6px;font-weight:600;color:#2563eb"></div>
+
+
+    <label>Kỳ hạn</label>
+    <select id="term" onchange="loadDefaultRates()">
+      <option value="1">1 tháng</option>
+      <option value="3">3 tháng</option>
+      <option value="6">6 tháng</option>
+      <option value="12" selected>12 tháng</option>
+      <option value="24">24 tháng</option>
+      <option value="36">36 tháng</option>
+    </select>
+
+    <label>Hình thức</label>
+    <select id="type">
+      <option value="simple">Lãi cuối kỳ</option>
+      <option value="compound">Lãi nhập gốc</option>
+    </select>
+
+    <label>Ngân hàng & lãi suất (%/năm)</label>
+
+    <label><input type="checkbox" id="ck_MB" checked>
+      <input class="bank-name" id="name_MB" value="MB Bank">
+    </label>
+    <input id="rate_MB" type="number" step="0.01" value="5.2">
+
+    <label><input type="checkbox" id="ck_TCB" checked>
+      <input class="bank-name" id="name_TCB" value="Techcombank">
+    </label>
+    <input id="rate_TCB" type="number" step="0.01" value="5.5">
+
+    <label><input type="checkbox" id="ck_VCB" checked>
+      <input class="bank-name" id="name_VCB" value="Vietcombank">
+    </label>
+    <input id="rate_VCB" type="number" step="0.01" value="4.6">
+
+    
+
+    
+
+    
+
+    
+
+    <button onclick="calc()">Tính lãi</button>
+
+    
+  </div>
+
+  <div class="card" id="result"></div>
+</div>
+
+<script>
+const result = document.getElementById('result');
+
+function money(n){
+  if(isNaN(n)) return '0 đ';
+  return Number(n).toLocaleString('vi-VN')+' đ';
+}
+
+function formatMoney(input){
+  let v = input.value.replace(/[^0-9]/g,'');
+  if(!v){
+    input.value='';
+    updateUnit(0);
+    return;
+  }
+  input.value = Number(v).toLocaleString('vi-VN');
+  updateUnit(Number(v));
+}
+
+function addMoney(amount){
+  let cur = Number(document.getElementById('money').value.replace(/\D/g,'')) || 0;
+  let total = cur + amount;
+  document.getElementById('money').value = total.toLocaleString('vi-VN');
+  document.getElementById('moneyRange').value = total;
+  updateUnit(total);
+}
+
+function syncSlider(){
+  let v = Number(document.getElementById('money').value.replace(/\D/g,'')) || 0;
+  document.getElementById('moneyRange').value = v;
+  updateUnit(v);
+}
+
+function syncInput(){
+  let v = Number(document.getElementById('moneyRange').value);
+  document.getElementById('money').value = v.toLocaleString('vi-VN');
+  updateUnit(v);
+}
+
+function updateUnit(v){
+  const el = document.getElementById('moneyUnit');
+  if(v >= 1000000000)
+    el.textContent = (v/1000000000).toFixed(2) + ' tỷ';
+  else if(v >= 1000000)
+    el.textContent = Math.round(v/1000000) + ' triệu';
+  else
+    el.textContent = v.toLocaleString('vi-VN') + ' đ';
+}
+
+
+
+function loadDefaultRates(){
+  const term = document.getElementById('term').value;
+  const rates = defaultRates[term];
+  if(!rates) return;
+  Object.keys(rates).forEach(id=>{
+    const input = document.getElementById('rate_'+id);
+    if(input) input.value = rates[id];
+  });
+}
+
+function calc(){
+
+  const m = Number(document.getElementById('money').value.replace(/\D/g,''));
+  if(!m || m<=0){result.innerHTML='⚠️ Nhập số tiền hợp lệ';return;}
+
+  const term = Number(document.getElementById('term').value);
+  const type = document.getElementById('type').value;
+
+  const banks=[
+    {id:'MB', name:'MB Bank', type:'state'},
+    {id:'TCB', name:'Techcombank', type:'private'},
+    {id:'VCB', name:'Vietcombank', type:'state'}
+  ];
+
+  // Lãi suất mặc định theo kỳ hạn (ví dụ tham khảo)
+  const defaultRates = {
+    6:  { MB:4.8, TCB:5.0, VCB:4.2, BIDV:4.3, CTG:4.3, ACB:4.9, VPB:5.1 },
+    12: { MB:5.2, TCB:5.5, VCB:4.6, BIDV:4.7, CTG:4.7, ACB:5.4, VPB:5.6 },
+    24: { MB:5.5, TCB:5.8, VCB:4.8, BIDV:4.9, CTG:4.9, ACB:5.6, VPB:5.9 }
+  };
+
+  let data=[];
+
+  banks.forEach(b=>{
+    const ck = document.getElementById('ck_'+b.id);
+    const rateInput = document.getElementById('rate_'+b.id);
+    if(!ck.checked) return;
+
+    const rate = Number(rateInput.value);
+    if(!rate || rate<=0) return;
+
+    let interest = 0;
+    if(type==='compound'){
+      interest = m * Math.pow(1 + rate/100, term/12) - m;
+    } else {
+      interest = m * rate/100 * term/12;
+    }
+
+    const customNameInput = document.getElementById('name_'+b.id);
+    const bankName = customNameInput ? customNameInput.value.trim() : b.name;
+
+    data.push({name: bankName || b.name, rate, interest, total:m+interest, type:b.type});({name:b.name, rate, interest, total:m+interest});
+  });
+
+  if(data.length===0){result.innerHTML='⚠️ Không có dữ liệu hợp lệ';return;}
+
+  // Sắp xếp theo lãi giảm dần
+  data.sort((a,b)=>b.interest - a.interest);
+
+  const topInterest = data[0].interest;
+
+  let html='';
+  data.forEach((d,i)=>{
+    const isTop = i===0;
+    const diff = topInterest - d.interest;
+
+    html += `<div class="${isTop?'winner':''}">
+      <div class="bank">🏦 ${d.name} ${isTop?'<span class="badge">Lãi cao nhất</span>':''}</div>
+      Lãi suất: ${d.rate}%/năm<br>
+      Tiền lãi: <b>${money(d.interest)}</b><br>
+      Tổng nhận: <b>${money(d.total)}</b><br>
+      ${!isTop?`<span class="diff">Chênh lệch so với cao nhất: -${money(diff)}</span>`:''}
+    </div>`;
+  });
+
+  result.innerHTML = html;
+}
+</script>
+</body>
+</html>
