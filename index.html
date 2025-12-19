@@ -99,20 +99,36 @@ button{width:100%;padding:12px;border:none;border-radius:14px;background:#2563eb
 <script>
 const result = document.getElementById('result');
 
+/* ✅ Lãi suất mặc định – đưa ra GLOBAL */
+const defaultRates = {
+  1:  { MB:4.5, TCB:4.35, VCB:2.1},
+  3:  { MB:4.65, TCB:4.65, VCB:2.4},
+  6:  { MB:5.3, TCB:5.85, VCB:3.5},
+  12: { MB:5.55, TCB:5.95, VCB:5.2},
+  24: { MB:6.2, TCB:5.95, VCB:5.3},
+  36: { MB:6.3, TCB:6.1, VCB:5.4}
+};
+
 function money(n){
   if(isNaN(n)) return '0 đ';
   return Number(n).toLocaleString('vi-VN')+' đ';
 }
 
+function loadDefaultRates(){
+  const term = document.getElementById('term').value;
+  const rates = defaultRates[term];
+  if(!rates) return;
+  Object.keys(rates).forEach(id=>{
+    const input = document.getElementById('rate_'+id);
+    if(input) input.value = rates[id];
+  });
+}
+
+/* ===== MONEY ===== */
 function formatMoney(input){
   let v = input.value.replace(/[^0-9]/g,'');
-  if(!v){
-    input.value='';
-    updateUnit(0);
-    return;
-  }
-  input.value = Number(v).toLocaleString('vi-VN');
-  updateUnit(Number(v));
+  input.value = v ? Number(v).toLocaleString('vi-VN') : '';
+  syncSlider();
 }
 
 function addMoney(amount){
@@ -137,96 +153,73 @@ function syncInput(){
 
 function updateUnit(v){
   const el = document.getElementById('moneyUnit');
-  if(v >= 1000000000)
-    el.textContent = (v/1000000000).toFixed(2) + ' tỷ';
-  else if(v >= 1000000)
-    el.textContent = Math.round(v/1000000) + ' triệu';
-  else
-    el.textContent = v.toLocaleString('vi-VN') + ' đ';
+  if(v >= 1e9) el.textContent = (v/1e9).toFixed(2)+' tỷ';
+  else if(v >= 1e6) el.textContent = Math.round(v/1e6)+' triệu';
+  else el.textContent = money(v);
 }
 
-
-
-function loadDefaultRates(){
-  const term = document.getElementById('term').value;
-  const rates = defaultRates[term];
-  if(!rates) return;
-  Object.keys(rates).forEach(id=>{
-    const input = document.getElementById('rate_'+id);
-    if(input) input.value = rates[id];
-  });
-}
-
+/* ===== CALC ===== */
 function calc(){
-
   const m = Number(document.getElementById('money').value.replace(/\D/g,''));
-  if(!m || m<=0){result.innerHTML='⚠️ Nhập số tiền hợp lệ';return;}
+  if(!m){result.innerHTML='⚠️ Nhập số tiền hợp lệ';return;}
 
   const term = Number(document.getElementById('term').value);
   const type = document.getElementById('type').value;
 
   const banks=[
-    {id:'MB', name:'MB Bank', type:'state'},
-    {id:'TCB', name:'Techcombank', type:'private'},
-    {id:'VCB', name:'Vietcombank', type:'state'}
+    {id:'MB',  type:'state',   label:'Nhà nước'},
+    {id:'TCB', type:'private', label:'Tư nhân'},
+    {id:'VCB', type:'state',   label:'Nhà nước'}
   ];
-
-  // Lãi suất mặc định theo kỳ hạn (ví dụ tham khảo)
-  const defaultRates = {
-	1:  { MB:4.5, TCB:4.35, VCB:2.1},
-	3:  { MB:4.65, TCB:4.65, VCB:2.4},
-    6:  { MB:5.3, TCB:5.85, VCB:3.5},
-    12: { MB:5.55, TCB:5.95, VCB:5.2},
-    24: { MB:6.2, TCB:5.95, VCB:5.3}
-  };
 
   let data=[];
 
   banks.forEach(b=>{
-    const ck = document.getElementById('ck_'+b.id);
-    const rateInput = document.getElementById('rate_'+b.id);
-    if(!ck.checked) return;
+    if(!document.getElementById('ck_'+b.id).checked) return;
 
-    const rate = Number(rateInput.value);
-    if(!rate || rate<=0) return;
+    const rate = Number(document.getElementById('rate_'+b.id).value);
+    if(!rate) return;
 
-    let interest = 0;
-    if(type==='compound'){
-      interest = m * Math.pow(1 + rate/100, term/12) - m;
-    } else {
-      interest = m * rate/100 * term/12;
-    }
+    const interest = type==='compound'
+      ? m * Math.pow(1 + rate/100, term/12) - m
+      : m * rate/100 * term/12;
 
-    const customNameInput = document.getElementById('name_'+b.id);
-    const bankName = customNameInput ? customNameInput.value.trim() : b.name;
+    const name = document.getElementById('name_'+b.id).value || b.id;
 
-    data.push({name: bankName || b.name, rate, interest, total:m+interest, type:b.type});({name:b.name, rate, interest, total:m+interest});
+    data.push({
+      name,
+      rate,
+      interest,
+      total: m + interest,
+      badge: b.label,
+      cls: b.type
+    });
   });
 
-  if(data.length===0){result.innerHTML='⚠️ Không có dữ liệu hợp lệ';return;}
+  if(!data.length){result.innerHTML='⚠️ Không có ngân hàng nào';return;}
 
-  // Sắp xếp theo lãi giảm dần
-  data.sort((a,b)=>b.interest - a.interest);
+  data.sort((a,b)=>b.interest-a.interest);
+  const max = data[0].interest;
 
-  const topInterest = data[0].interest;
-
-  let html='';
-  data.forEach((d,i)=>{
-    const isTop = i===0;
-    const diff = topInterest - d.interest;
-
-    html += `<div class="${isTop?'winner':''}">
-      <div class="bank">🏦 ${d.name} ${isTop?'<span class="badge">Lãi cao nhất</span>':''}</div>
+  result.innerHTML = data.map((d,i)=>`
+    <div class="${i===0?'winner':''}">
+      <div class="bank">
+        🏦 ${d.name}
+        <span class="badge ${d.cls}">${d.badge}</span>
+        ${i===0?'<span class="badge">Lãi cao nhất</span>':''}
+      </div>
       Lãi suất: ${d.rate}%/năm<br>
       Tiền lãi: <b>${money(d.interest)}</b><br>
       Tổng nhận: <b>${money(d.total)}</b><br>
-      ${!isTop?`<span class="diff">Chênh lệch so với cao nhất: -${money(diff)}</span>`:''}
-    </div>`;
-  });
-
-  result.innerHTML = html;
+      ${i?`<span class="diff">Kém nhất: -${money(max-d.interest)}</span>`:''}
+    </div>
+  `).join('');
 }
+
+/* load lần đầu */
+loadDefaultRates();
+updateUnit(100000000);
 </script>
+
 </body>
 </html>
-
